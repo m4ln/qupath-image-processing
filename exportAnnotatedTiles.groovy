@@ -1,18 +1,18 @@
-/**
- * Script to export pixels & annotations for whole slide images.
- *
- * The image can optionally be tiled during export, so that even large images can be exported at high resolution.
- * (Note: In this case 'tiled' means as separate, non-overlapping images... not a single, tiled pyramidal image.)
- *
- * The downsample value and coordinates are encoded in each image file name.
- *
- * The annotations are exported as 8-bit labelled images.
- * These labels depend upon annotation classifications; a text file giving the key is written for reference.
- *
- * The labelled image can also optionally use indexed colors to depict the colors of the
- * original classifications within QuPath for easier visualization & comparison.
- *
- * @author Pete Bankhead
+/*
+ Script to export pixels & annotations for whole slide images.
+ 
+ The image can optionally be tiled during export, so that even large images can be exported at high resolution.
+ (Note: In this case 'tiled' means as separate, non-overlapping images... not a single, tiled pyramidal image.)
+ 
+ The downsample value and coordinates are encoded in each image file name.
+ 
+ The annotations are exported as 8-bit labelled images.
+ These labels depend upon annotation classifications; a text file giving the key is written for reference.
+ 
+ The labelled image can also optionally use indexed colors to depict the colors of the
+ original classifications within QuPath for easier visualization & comparison.
+
+ @author Pete Bankhead
  */
 
 
