@@ -1,18 +1,18 @@
-/*
- Script to export pixels & annotations for whole slide images.
- 
- The image can optionally be tiled during export, so that even large images can be exported at high resolution.
- (Note: In this case 'tiled' means as separate, non-overlapping images... not a single, tiled pyramidal image.)
- 
- The downsample value and coordinates are encoded in each image file name.
- 
- The annotations are exported as 8-bit labelled images.
- These labels depend upon annotation classifications; a text file giving the key is written for reference.
- 
- The labelled image can also optionally use indexed colors to depict the colors of the
- original classifications within QuPath for easier visualization & comparison.
-
- @author Pete Bankhead
+/**
+ * Script to export pixels & annotations for whole slide images.
+ *
+ * The image can optionally be tiled during export, so that even large images can be exported at high resolution.
+ * (Note: In this case 'tiled' means as separate, non-overlapping images... not a single, tiled pyramidal image.)
+ *
+ * The downsample value and coordinates are encoded in each image file name.
+ *
+ * The annotations are exported as 8-bit labelled images.
+ * These labels depend upon annotation classifications; a text file giving the key is written for reference.
+ *
+ * The labelled image can also optionally use indexed colors to depict the colors of the
+ * original classifications within QuPath for easier visualization & comparison.
+ *
+ * @author Pete Bankhead
  */
 
 
@@ -26,15 +26,17 @@ import java.awt.image.DataBufferByte
 import java.awt.image.IndexColorModel
 
 // ================================ INITIALIZE PARAMETERS HERE =========================================================
-// Requested pixel size - used to define output resolution
+// Output directory for storing the tiles
+def saveDir = '/Z:/Marlen/datasets/beauty-and-beast/'
+
 // set downsample = 1 to use the full resolution and downsample > 1 for lower resolution
 double downsample = 1
 
 // Maximum size of an image tile when exporting
-int maxTileSize = 512
+int maxTileSize = 256
 
 // Ignore annotations that don't have a classification set
-boolean skipUnclassifiedAnnotations = true
+boolean skipUnclassifiedAnnotations = false
 
 // Skip tiles without annotations (WARNING: all image tiles will be written, this may take a lot of time and memory)
 boolean skipUnannotatedTiles = true
@@ -42,7 +44,7 @@ boolean skipUnannotatedTiles = true
 // Create an 8-bit indexed label image
 // This is very useful for display/previewing - although need to be careful when importing into other software,
 // which can prefer to replaces labels with the RGB colors they refer to
-boolean createIndexedImageLabels = true
+boolean createIndexedImageLabels = false
 
 // Export the original pixels (assumed to be RGB) for each tile
 boolean exportOriginalPixels = true
@@ -52,10 +54,6 @@ boolean exportOriginalPixels = true
 def imageFormat = 'JPG'
 
 // =====================================================================================================================
-
-// Output directory for storing the tiles
-def pathOutput = QPEx.buildFilePath(QPEx.PROJECT_BASE_DIR, 'exported_tiles_' + maxTileSize + '_' + downsample)
-QPEx.mkdirs(pathOutput)
 
 // Checking and writing inputs
 if(downsample < 1){
@@ -79,6 +77,11 @@ println parameterInfo
 def imageData = getCurrentImageData()
 def hierarchy = imageData.getHierarchy()
 def server = imageData.getServer()
+
+// create output directory
+def name_tmp = GeneralTools.getNameWithoutExtension(imageData.getServer().getMetadata().getName())
+def pathOutput = buildFilePath(saveDir, name_tmp, maxTileSize.toString())
+QPEx.mkdirs(pathOutput)
 
 // Get the annotations that have ROIs & are have classifications (if required)
 def annotations = hierarchy.getFlattenedObjectList(null).findAll {
@@ -105,13 +108,15 @@ def a = r.clone()
 pathClasses.eachWithIndex{ PathClass entry, int i ->
     // Record integer label for key
     int label = i+1
-  String name = entry == null ? 'None' : entry.toString()
+    String name = entry == null ? 'None' : entry.toString()
     labelKey << name << '\t' << label << System.lineSeparator()
     // Store Color based on label - needed for painting with Graphics2D
     pathClassColors.put(entry, new Color(label, label, label))
+
     // Update RGB values for IndexColorModel
     // Use gray as the default color indicating no classification
     int rgb = entry == null ? ColorTools.makeRGB(127, 127, 127) : entry.getColor()
+
     r[label] = ColorTools.red(rgb)
     g[label] = ColorTools.green(rgb)
     b[label] = ColorTools.blue(rgb)
@@ -197,11 +202,15 @@ requests.parallelStream().forEach { request ->
             def imgMaskColor = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_INDEXED, colorModel)
             System.arraycopy(bytes, 0, imgMaskColor.getRaster().getDataBuffer().getData(), 0, width*height)
             imgMask = imgMaskColor
+            // Write the mask
+            def fileOutput = new File(pathOutput, name + '-labels.png')
+            ImageIO.write(imgMask, 'PNG', fileOutput)
         }
-        // Write the mask
-        def fileOutput = new File(pathOutput, name + '-labels.png')
-        ImageIO.write(imgMask, 'PNG', fileOutput)
-
+    	/*
+    	// Write the mask
+    	def fileOutput = new File(pathOutput, name + '-labels.png')
+    	ImageIO.write(imgMask, 'PNG', fileOutput)
+	*/
         if (exportOriginalPixels) {
             def img = server.readBufferedImage(request)
             width = img.getWidth()
