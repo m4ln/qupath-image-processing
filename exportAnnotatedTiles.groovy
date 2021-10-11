@@ -17,9 +17,6 @@
 
 
 // Imports
-import qupath.lib.images.servers.ImageServer
-import qupath.lib.objects.PathObject
-
 import javax.imageio.ImageIO
 import java.awt.Color
 import java.awt.image.DataBufferByte
@@ -32,8 +29,8 @@ def saveDir = '/Z:/Marlen/test'
 // set downsample = 1 to use the full resolution and downsample > 1 for lower resolution
 double downsample = 100
 
-// Maximum size of an image tile when exporting
-int maxTileSize = 5000
+// size of each tile, in pixels
+int tileSize = 5000
 
 // Ignore annotations that don't have a classification set
 boolean skipUnclassifiedAnnotations = true
@@ -60,7 +57,7 @@ boolean exportProject = true
 int imageNumber = 11
 
 // set true to save tiles for each WSI in seperate folder
-boolean storeTilesSeperately = true
+boolean storeTilesSeperately = false
 // =====================================================================================================================
 
 def imageList
@@ -85,7 +82,7 @@ for (image in imageList) {
     // prepare stringBuilder to write parameters into text-file
     def parameterInfo = new StringBuilder()
     parameterInfo   << '\ndownsample' << '\t' << downsample << System.lineSeparator()
-                    << 'maxTileSize' << '\t' << maxTileSize << System.lineSeparator()
+                    << 'tileSize' << '\t' << tileSize << System.lineSeparator()
                     << 'skipUnclassifiedAnnotations' << '\t' << skipUnclassifiedAnnotations << System.lineSeparator()
                     << 'skipUnannotatedTiles' << '\t' << skipUnannotatedTiles << System.lineSeparator()
                     << 'createIndexedImageLabels' << '\t' << createIndexedImageLabels << System.lineSeparator()
@@ -105,13 +102,13 @@ for (image in imageList) {
     def pathOutput
     if (storeTilesSeperately) {
         wsi_name = GeneralTools.getNameWithoutExtension(imageData.getServer().getMetadata().getName())
-        pathOutput = buildFilePath(saveDir, wsi_name, maxTileSize.toString())
+        pathOutput = buildFilePath(saveDir, wsi_name, tileSize.toString())
     }
     else {
-        pathOutput = buildFilePath(saveDir, maxTileSize.toString())
+        pathOutput = buildFilePath(saveDir, tileSize.toString())
     }
 
-    QPEx.mkdirs(pathOutput)
+    mkdirs(pathOutput)
     
     // Get the annotations that have ROIs & are have classifications (if required)
     def annotations = hierarchy.getFlattenedObjectList(null).findAll {
@@ -154,7 +151,7 @@ for (image in imageList) {
     }
     
     // Calculate the tile spacing in full resolution pixels
-    int spacing = (int)(maxTileSize * downsample)
+    int spacing = (int)(tileSize * downsample)
     
     // Create the RegionRequests
     def requests = new ArrayList<RegionRequest>()
@@ -173,7 +170,7 @@ for (image in imageList) {
     // Write the label 'key'
     println labelKey
     String imgName = server.getMetadata().getName()
-    def keyName = String.format('%s_(downsample=%.3f,tiles=%d)-key.txt', imgName, downsample, maxTileSize)
+    def keyName = String.format('%s_(downsample=%.3f,tiles=%d)-key.txt', imgName, downsample, tileSize)
     def fileLabels = new File(pathOutput, keyName)
     fileLabels.text = parameterInfo.toString() + labelKey.toString()
     
