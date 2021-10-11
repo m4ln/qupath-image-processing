@@ -60,7 +60,7 @@ boolean exportProject = true
 int imageNumber = 11
 
 // set true to save tiles for each WSI in seperate folder
-boolean storeTilesSeperately = false
+boolean storeTilesSeperately = true
 // =====================================================================================================================
 
 def imageList
