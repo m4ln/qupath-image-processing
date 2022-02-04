@@ -5,19 +5,20 @@
 
 // ================================ INITIALIZE PARAMETERS HERE =========================================================
 // path to save data
-def saveDir = '/Z:/Marlen/test'
+def saveDir = '/Z:/Marlen/datasets/tatar/'
 
 // size of each tile, in pixels
-int tileSize = 1000
+int tileSize = 2048/4
 
-// downsample factor (1 = no downsampling)
-double downsample = 10
+// downsample factor (changes the resolution: < 1 higher resolution; 1 no downsampling; > 1 lower resolution)
+double downsample = 2
 
 // output resolution in calibrated units (e.g. µm if available)
+// use this instead of downsample to change the resolution
 double requestedPixelSize = 0
 
 // overlap, in pixel units at the export resolution, (0 = no overlap)
-int overlapSize = tileSize/4
+int overlapSize = tileSize/2
 
 // Define file extension for original pixels (often .tif, .jpg, '.png' or '.ome.tif')
 def imageFormat = '.png'
@@ -29,7 +30,7 @@ boolean annotatedTilesOnly = false
 boolean exportProject = false
 
 // in case exportProject is false, define the number of the image to export (starting from 0) 
-int imageNumber = 11
+int imageNumber = 0
 
 // set true to save tiles for each WSI in seperate folder
 boolean storeTilesSeperately = true
@@ -58,7 +59,8 @@ for (image in imageList) {
     def pathOutput
     if (storeTilesSeperately) {
         wsi_name = GeneralTools.getNameWithoutExtension(imageData.getServer().getMetadata().getName())
-        pathOutput = buildFilePath(saveDir, wsi_name, tileSize.toString())
+        folder_name =  "sz" + tileSize.toString() + "_ds" + downsample.toString() + "_os" + overlapSize.toString() 
+        pathOutput = buildFilePath(saveDir, wsi_name, folder_name )
     }
     else {
         pathOutput = buildFilePath(saveDir, tileSize.toString())
