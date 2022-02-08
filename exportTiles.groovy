@@ -10,7 +10,7 @@ def saveDir = '/Z:/Marlen/datasets/tatar/'
 // size of each tile, in pixels
 int tileSize = 2048/4
 
-// downsample factor (changes the resolution: < 1 higher resolution; 1 no downsampling; > 1 lower resolution)
+// downsample factor (changes the resolution: < 1 higher resolution; 1 full resolution; > 1 lower resolution)
 double downsample = 2
 
 // output resolution in calibrated units (e.g. µm if available)
