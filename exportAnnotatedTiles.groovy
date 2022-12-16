@@ -24,19 +24,22 @@ import java.awt.image.IndexColorModel
 
 // ================================ INITIALIZE PARAMETERS HERE =========================================================
 // Output directory for storing the tiles
-def saveDir = '/Z:/Marlen/test'
+def saveDir = '/Z:/marlen/histoSeg/urothel/extracted_patches'
 
-// set downsample = 1 to use the full resolution and downsample > 1 for lower resolution
-double downsample = 100
+// downsample factor (changes the resolution: < 1 higher resolution; 1 full resolution; > 1 lower resolution)
+double downsample = 1
 
 // size of each tile, in pixels
-int tileSize = 5000
+int tileSize = 256
+
+// overlap, in pixel units at the export resolution, (0 = no overlap)
+int overlapSize = tileSize/2
 
 // Ignore annotations that don't have a classification set
 boolean skipUnclassifiedAnnotations = true
 
 // Skip tiles without annotations (WARNING: all image tiles will be written, this may take a lot of time and memory)
-boolean skipUnannotatedTiles = true
+boolean skipUnannotatedTiles = false
 
 // Create an 8-bit indexed label image
 // This is very useful for display/previewing - although need to be careful when importing into other software,
@@ -51,13 +54,13 @@ boolean exportOriginalPixels = true
 def imageFormat = 'PNG'
 
 // export tiles from whole project (instead of single file selected)
-boolean exportProject = true
+boolean exportProject = false
 
 // in case exportProject is false, define the number of the image to export (starting from 0) 
-int imageNumber = 11
+int imageNumber = 12
 
 // set true to save tiles for each WSI in seperate folder
-boolean storeTilesSeperately = false
+boolean storeTilesSeperately = true
 // =====================================================================================================================
 
 def imageList
@@ -100,12 +103,13 @@ for (image in imageList) {
     // create output directory
     def wsi_name
     def pathOutput
+    folder_name =  "sz" + tileSize.toString() + "_ds" + downsample.toString() + "_os" + overlapSize.toString() 
     if (storeTilesSeperately) {
         wsi_name = GeneralTools.getNameWithoutExtension(imageData.getServer().getMetadata().getName())
-        pathOutput = buildFilePath(saveDir, wsi_name, tileSize.toString())
+        pathOutput = buildFilePath(saveDir, wsi_name, folder_name)
     }
     else {
-        pathOutput = buildFilePath(saveDir, tileSize.toString())
+        pathOutput = buildFilePath(saveDir, folder_name)
     }
 
     mkdirs(pathOutput)
@@ -151,21 +155,33 @@ for (image in imageList) {
     }
     
     // Calculate the tile spacing in full resolution pixels
-    int spacing = (int)(tileSize * downsample)
+    int patchSize = (int)(tileSize * downsample)
+    int stepSize = (int)(tileSize * downsample) - overlapSize
     
-    // Create the RegionRequests
+    // Create the RegionRequests ()
+    int cnt = 0
     def requests = new ArrayList<RegionRequest>()
-    for (int y = 0; y < server.getHeight(); y += spacing) {
-        int h = spacing
+    for (int y = 0; y < server.getHeight(); y += stepSize) {
+        int h = patchSize
         if (y + h > server.getHeight())
-            h = server.getHeight() - y
-        for (int x = 0; x < server.getWidth(); x += spacing) {
-            int w = spacing
+            // skip
+            continue
+            //h = server.getHeight() - y
+        for (int x = 0; x < server.getWidth(); x += stepSize) {
+            int w = patchSize
             if (x + w > server.getWidth())
-                w = server.getWidth() - x
+            continue
+                //w = server.getWidth() - x
+            println(x)
+            println(y)
+            println(w)
+            println(h)
+            println('---')
+            cnt++
             requests << RegionRequest.createInstance(server.getPath(), downsample, x, y, w, h)
         }
     }
+    println('number extracted images ' + cnt)
     
     // Write the label 'key'
     println labelKey
