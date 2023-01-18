@@ -27,24 +27,28 @@ import java.awt.image.IndexColorModel
 def saveDir = '/Z:/marlen/histoSeg/urothel/extracted_patches'
 
 // downsample factor (changes the resolution: < 1 higher resolution; 1 full resolution; > 1 lower resolution)
-double downsample = 1
+double downsample = 10
 
 // size of each tile, in pixels
-int tileSize = 256
+int tileSize = 512
 
 // overlap, in pixel units at the export resolution, (0 = no overlap)
 int overlapSize = tileSize/2
+
+// remove background images, i.e when the labeled pixels inside the mask covers less than backgroundThreshold [%] of the total area of the mask
+boolean removeBackgroundImages = true
+double backgroundThreshold = 0.1
 
 // Ignore annotations that don't have a classification set
 boolean skipUnclassifiedAnnotations = true
 
 // Skip tiles without annotations (WARNING: all image tiles will be written, this may take a lot of time and memory)
-boolean skipUnannotatedTiles = false
+boolean skipUnannotatedTiles = true
 
 // Create an 8-bit indexed label image
 // This is very useful for display/previewing - although need to be careful when importing into other software,
 // which can prefer to replaces labels with the RGB colors they refer to
-boolean createIndexedImageLabels = false
+boolean createIndexedImageLabels = true
 
 // Export the original pixels (assumed to be RGB) for each tile
 boolean exportOriginalPixels = true
@@ -57,12 +61,21 @@ def imageFormat = 'PNG'
 boolean exportProject = false
 
 // in case exportProject is false, define the number of the image to export (starting from 0) 
-int imageNumber = 12
+int imageNumber = 1
 
 // set true to save tiles for each WSI in seperate folder
 boolean storeTilesSeperately = true
 // =====================================================================================================================
 
+// ================================ DO NOT CHANGE ANYTHING BELOW THIS LINE ==============================================
+
+// Checking and writing inputs
+if(downsample < 1){
+    print('WARNING: downsample factor < 1, will be set to 1')
+    downsample = 1
+    }
+
+// get the list of images to export (either from project or from single file)
 def imageList
 
 if (exportProject){
@@ -73,18 +86,15 @@ else {
     imageList = project.getImageList()[imageNumber]
 }
 
-print imageList
+println('WSI files to export: ' + imageList)
 
+// loop over all image files
 for (image in imageList) {
-    print  'exporting: ' + image  + '\n'
-    // Checking and writing inputs
-    if(downsample < 1){
-        downsample = 1
-    }
+    print('\nexporting file: ' + image)
     
     // prepare stringBuilder to write parameters into text-file
     def parameterInfo = new StringBuilder()
-    parameterInfo   << '\ndownsample' << '\t' << downsample << System.lineSeparator()
+    parameterInfo   << '\n\ndownsample' << '\t' << downsample << System.lineSeparator()
                     << 'tileSize' << '\t' << tileSize << System.lineSeparator()
                     << 'skipUnclassifiedAnnotations' << '\t' << skipUnclassifiedAnnotations << System.lineSeparator()
                     << 'skipUnannotatedTiles' << '\t' << skipUnannotatedTiles << System.lineSeparator()
@@ -114,11 +124,11 @@ for (image in imageList) {
 
     mkdirs(pathOutput)
     
-    // Get the annotations that have ROIs & are have classifications (if required)
+    // Get the annotations that have ROIs & classifications (if required)
     def annotations = hierarchy.getFlattenedObjectList(null).findAll {
         it.isAnnotation() && it.hasROI() && (!skipUnclassifiedAnnotations || it.getPathClass() != null) }
     
-    // Get all the represented classifications
+    // Get all the represented classes
     def pathClasses = annotations.collect({it.getPathClass()}) as Set
     
     // We can't handle more than 255 classes (because of 8-bit representation)
@@ -131,11 +141,16 @@ for (image in imageList) {
     // Also, create a LUT for visualizing more easily
     def labelKey = new StringBuilder()
     def pathClassColors = [:]
+    // Used to store the RGB values for an IndexColorModel
     int n = pathClasses.size() + 1
     def r = ([(byte)0] * n) as byte[]
     def g = r.clone()
     def b = r.clone()
     def a = r.clone()
+    // print variables
+    println 'Number of classes: ' + pathClasses.size()
+    println 'Number of annotations: ' + annotations.size()
+
     pathClasses.eachWithIndex{ PathClass entry, int i ->
         // Record integer label for key
         int label = i+1
@@ -153,40 +168,45 @@ for (image in imageList) {
         b[label] = ColorTools.blue(rgb)
         a[label] = 255
     }
+    println 'red: ' + r
+    println 'green: ' + g
+    println 'blue: ' + b
+    println 'alpha: ' + a
     
     // Calculate the tile spacing in full resolution pixels
     int patchSize = (int)(tileSize * downsample)
     int stepSize = (int)(tileSize * downsample) - overlapSize
     
+    println '\npatchSize: ' + patchSize
+    println 'stepSize: ' + stepSize
+
     // Create the RegionRequests ()
     int cnt = 0
     def requests = new ArrayList<RegionRequest>()
     for (int y = 0; y < server.getHeight(); y += stepSize) {
         int h = patchSize
         if (y + h > server.getHeight())
-            // skip
-            continue
-            //h = server.getHeight() - y
+            // skip last patch if it is smaller than patchSize (if image size is not a multiple of patchSize)
+            // continue
+            // last patch will be smaller than patchSize if image size is not a multiple of patchSize 
+            h = server.getHeight() - y
         for (int x = 0; x < server.getWidth(); x += stepSize) {
             int w = patchSize
             if (x + w > server.getWidth())
-            continue
-                //w = server.getWidth() - x
-            println(x)
-            println(y)
-            println(w)
-            println(h)
-            println('---')
+                // skip last patch if it is smaller than patchSize (if image size is not a multiple of patchSize)
+                // continue
+                // last patch will be smaller than patchSize if image size is not a multiple of patchSize 
+                w = server.getWidth() - x
             cnt++
             requests << RegionRequest.createInstance(server.getPath(), downsample, x, y, w, h)
         }
     }
-    println('number extracted images ' + cnt)
+    println('number requion requests ' + cnt)
     
-    // Write the label 'key'
-    println labelKey
+    // Write the label 'keys'
+    println 'labelKeys:\n' + labelKey
     String imgName = server.getMetadata().getName()
-    def keyName = String.format('%s_(downsample=%.3f,tiles=%d)-key.txt', imgName, downsample, tileSize)
+    def keyName = String.format('%s_(tileSize=%d,downsample=%.3f,overlap=%d).txt', imgName, tileSize, downsample, overlapSize)
     def fileLabels = new File(pathOutput, keyName)
     fileLabels.text = parameterInfo.toString() + labelKey.toString()
     
@@ -201,7 +221,7 @@ for (image in imageList) {
                 request.getWidth(),
                 request.getHeight()
         )
-    
+
         // Export the raw image pixels if necessary
         // If we do this, store the width & height - to make sure we have an exact match
         int width = -1
@@ -220,6 +240,7 @@ for (image in imageList) {
         g2d.scale(1.0/downsample, 1.0/downsample)
         g2d.translate(-request.getX(), -request.getY())
         int count = 0
+        // iterate through all annotations
         for (annotation in annotations) {
             def roi = annotation.getROI()
             if (!request.intersects(roi.getBoundsX(), roi.getBoundsY(), roi.getBoundsWidth(), roi.getBoundsHeight()))
@@ -245,6 +266,18 @@ for (image in imageList) {
                 def imgMaskColor = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_INDEXED, colorModel)
                 System.arraycopy(bytes, 0, imgMaskColor.getRaster().getDataBuffer().getData(), 0, width*height)
                 imgMask = imgMaskColor
+                
+                // don't write images which have a lot of background if true
+                if (removeBackgroundImages) {
+                    int pixel_count = 0
+                    for (int i = 0; i < bytes.length; i++) {
+                        if (bytes[i] != 0)
+                            pixel_count++
+                    }
+                    if (pixel_count < width * height * backgroundThreshold)
+                        return
+                }
+
                 // Write the mask
                 def fileOutput = new File(pathOutput, name + '-labels.png')
                 ImageIO.write(imgMask, 'PNG', fileOutput)
@@ -264,4 +297,4 @@ for (image in imageList) {
         }
     }
 }  
-print 'Done all!'
+print 'Done all!\n'
