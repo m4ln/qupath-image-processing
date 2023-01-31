@@ -26,8 +26,11 @@ import java.awt.image.IndexColorModel
 // Output directory for storing the tiles
 def saveDir = '/Z:/marlen/histoSeg/urothel/extracted_patches'
 
+// set a value to limit the number of tiles to export
+int maxTiles = 20000
+
 // downsample factor (changes the resolution: < 1 higher resolution; 1 full resolution; > 1 lower resolution)
-double downsample = 40
+double downsample = 1
 
 // size of each tile, in pixels
 int tileSize = 512
@@ -58,16 +61,13 @@ boolean exportOriginalPixels = true
 def imageFormat = 'PNG'
 
 // export tiles from whole project (instead of single file selected)
-boolean exportProject = false
+boolean exportProject = true
 
 // in case exportProject is false, define the number of the image to export (starting from 0) 
 int imageNumber = 10
 
 // set true to save tiles for each WSI in seperate folder
 boolean storeTilesSeperately = false
-
-// set a value to limit the number of tiles to export
-int maxTiles = 20000
 
 // =====================================================================================================================
 
@@ -172,16 +172,9 @@ for (image in imageList) {
         b[label] = ColorTools.blue(rgb)
         a[label] = 255
     }
-    println 'red: ' + r
-    println 'green: ' + g
-    println 'blue: ' + b
-    println 'alpha: ' + a
-    
-    // Calculate the tile spacing in full resolution pixels
-    println tileSize
+
     int patchSize = (int)(tileSize * downsample)
     int stepSize = (int)(tileSize * downsample) - overlapSize
-    println tileSize
     println '\npatchSize: ' + patchSize
     println 'stepSize: ' + stepSize
 
@@ -210,10 +203,10 @@ for (image in imageList) {
                 break
         }
     }
-    println('number of tiles to extract: ' + tiles_cnt)
+    println('\nnumber of tiles to extract: ' + tiles_cnt)
     
     // Write the label 'keys'
-    println 'labelKeys:\n' + labelKey
+    println '\nlabelKeys:\n' + labelKey
     String imgName = server.getMetadata().getName()
     def keyName = String.format('%s_(tileSize=%d,downsample=%.3f,overlap=%d).txt', imgName, tileSize, downsample, overlapSize)
     def fileLabels = new File(pathOutput, keyName)
@@ -291,11 +284,7 @@ for (image in imageList) {
                 def fileOutput = new File(pathOutput, name + '-labels.png')
                 ImageIO.write(imgMask, 'PNG', fileOutput)
             }
-        	/*
-        	// Write the mask
-        	def fileOutput = new File(pathOutput, name + '-labels.png')
-        	ImageIO.write(imgMask, 'PNG', fileOutput)
-    	*/
+
             if (exportOriginalPixels) {
                 def img = server.readBufferedImage(request)
                 width = img.getWidth()
