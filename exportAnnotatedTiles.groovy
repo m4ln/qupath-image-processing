@@ -27,17 +27,17 @@ import java.awt.image.IndexColorModel
 def saveDir = '/Z:/marlen/histoSeg/urothel/extracted_patches'
 
 // downsample factor (changes the resolution: < 1 higher resolution; 1 full resolution; > 1 lower resolution)
-double downsample = 10
+double downsample = 40
 
 // size of each tile, in pixels
 int tileSize = 512
 
 // overlap, in pixel units at the export resolution, (0 = no overlap)
-int overlapSize = tileSize/2
+int overlapSize = 0
 
 // remove background images, i.e when the labeled pixels inside the mask covers less than backgroundThreshold [%] of the total area of the mask
 boolean removeBackgroundImages = true
-double backgroundThreshold = 0.1
+double backgroundThreshold = 0.3
 
 // Ignore annotations that don't have a classification set
 boolean skipUnclassifiedAnnotations = true
@@ -61,10 +61,14 @@ def imageFormat = 'PNG'
 boolean exportProject = false
 
 // in case exportProject is false, define the number of the image to export (starting from 0) 
-int imageNumber = 1
+int imageNumber = 10
 
 // set true to save tiles for each WSI in seperate folder
-boolean storeTilesSeperately = true
+boolean storeTilesSeperately = false
+
+// set a value to limit the number of tiles to export
+int maxTiles = 20000
+
 // =====================================================================================================================
 
 // ================================ DO NOT CHANGE ANYTHING BELOW THIS LINE ==============================================
@@ -113,7 +117,7 @@ for (image in imageList) {
     // create output directory
     def wsi_name
     def pathOutput
-    folder_name =  "sz" + tileSize.toString() + "_ds" + downsample.toString() + "_os" + overlapSize.toString() 
+    folder_name =  "sz" + tileSize.toString() + "_ds" + downsample.toString() + "_os" + overlapSize.toString() + "_bg" + backgroundThreshold.toString() 
     if (storeTilesSeperately) {
         wsi_name = GeneralTools.getNameWithoutExtension(imageData.getServer().getMetadata().getName())
         pathOutput = buildFilePath(saveDir, wsi_name, folder_name)
@@ -174,34 +178,39 @@ for (image in imageList) {
     println 'alpha: ' + a
     
     // Calculate the tile spacing in full resolution pixels
+    println tileSize
     int patchSize = (int)(tileSize * downsample)
     int stepSize = (int)(tileSize * downsample) - overlapSize
-    
+    println tileSize
     println '\npatchSize: ' + patchSize
     println 'stepSize: ' + stepSize
 
     // Create the RegionRequests ()
-    int cnt = 0
+    int tiles_cnt = 0
     def requests = new ArrayList<RegionRequest>()
     for (int y = 0; y < server.getHeight(); y += stepSize) {
         int h = patchSize
         if (y + h > server.getHeight())
             // skip last patch if it is smaller than patchSize (if image size is not a multiple of patchSize)
-            // continue
+            continue
             // last patch will be smaller than patchSize if image size is not a multiple of patchSize 
-            h = server.getHeight() - y
+            // h = server.getHeight() - y
         for (int x = 0; x < server.getWidth(); x += stepSize) {
             int w = patchSize
             if (x + w > server.getWidth())
                 // skip last patch if it is smaller than patchSize (if image size is not a multiple of patchSize)
-                // continue
+                continue
                 // last patch will be smaller than patchSize if image size is not a multiple of patchSize 
-                w = server.getWidth() - x
-            cnt++
+                // w = server.getWidth() - x
+
             requests << RegionRequest.createInstance(server.getPath(), downsample, x, y, w, h)
+
+            tiles_cnt++
+            if (maxTiles > 0 && tiles_cnt >= maxTiles)
+                break
         }
     }
-    println('number requion requests ' + cnt)
+    println('number of tiles to extract: ' + tiles_cnt)
     
     // Write the label 'keys'
     println 'labelKeys:\n' + labelKey
