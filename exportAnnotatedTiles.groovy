@@ -24,23 +24,23 @@ import java.awt.image.IndexColorModel
 
 // ================================ INITIALIZE PARAMETERS HERE =========================================================
 // Output directory for storing the tiles
-def saveDir = '/Z:/marlen/histoSeg/urothel/qupath/extracted_patches_group1'
+def saveDir = '/Z:/marlen/robin'
 
 // set a value to limit the number of tiles to export
 // Todo bugfix: works correctly but doesn't keep in mind background images, so actually number extracted might be much lower
-int maxTiles = 30000
+int maxTiles = 2000
 
 // downsample factor (changes the resolution: < 1 higher resolution; 1 full resolution; > 1 lower resolution)
-double downsample = 3
+double downsample = 1
 // size of each tile, in pixels
 int tileSize = 512
 
 // overlap, in pixel units at the export resolution, (0 = no overlap)
-int overlapSize = tileSize/1.2
+int overlapSize = 0
 
 // remove background images, i.e when the labeled pixels inside the mask covers less than backgroundThreshold [%] of the total area of the mask
 boolean removeBackgroundImages = true
-double backgroundThreshold = 0.3
+double backgroundThreshold = 0.8
 
 // Ignore annotations that don't have a classification set
 boolean skipUnclassifiedAnnotations = true
@@ -61,13 +61,17 @@ boolean exportOriginalPixels = true
 def imageFormat = 'PNG'
 
 // export tiles from whole project (instead of single file selected)
-boolean exportProject = true
+boolean exportProject = false
 
 // in case exportProject is false, define the number of the image to export (starting from 0) 
-int imageNumber = 2
+int imageNumber = 11
 
 // set true to save tiles for each WSI in seperate folder
 boolean storeTilesSeperately = false
+
+// set this if only a specific class should be exported
+def exportOnlyOneClass = true
+def classToExport = 'Tumor'
 
 // =====================================================================================================================
 
@@ -178,7 +182,7 @@ for (image in imageList) {
     println '\npatchSize: ' + patchSize
     println 'stepSize: ' + stepSize
 
-    // Create the RegionRequests, i.e the image patches from the whoe image
+    // Create the RegionRequests, i.e the image patches from the whole image
     int tiles_cnt = 0
     def requests = new ArrayList<RegionRequest>()
     for (int y = 0; y < server.getHeight(); y += stepSize) {
@@ -244,9 +248,11 @@ for (image in imageList) {
         int count = 0
         // iterate through all annotations
         for (annotation in annotations) {
-            // // if annotation does not contain pathClass bladder wall, skip it
-            // if (!annotation.getPathClass().toString().equals('perivesicular fat'))
-            //     continue
+            if (exportOnlyOneClass) {
+                // if annotation does not contain 'classToExport', skip it
+                if (!annotation.getPathClass().toString().equals(classToExport))
+                    continue
+            }
             def roi = annotation.getROI()
             if (!request.intersects(roi.getBoundsX(), roi.getBoundsY(), roi.getBoundsWidth(), roi.getBoundsHeight()))
                 continue
